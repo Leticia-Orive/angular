@@ -1,0 +1,293 @@
+<div class="map-container">
+  <!-- ========== PANEL SUPERIOR DE BÚSQUEDA Y CONTROLES ========== -->
+  <div class="search-panel">
+    <mat-card class="search-card">
+      <mat-card-content>
+
+        <!-- ===== SECCIÓN DE BÚSQUEDA ===== -->
+        <!-- Permite buscar lugares por nombre, ciudad, dirección o descripción -->
+        <div class="search-section">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Buscar lugares en España</mat-label>
+            <!-- Campo de texto con enlace bidireccional [(ngModel)] -->
+            <!-- (keyup.enter) ejecuta búsqueda al presionar Enter -->
+            <input matInput
+                   [(ngModel)]="searchQuery"
+                   (keyup.enter)="onSearch()"
+                   placeholder="Ej: Madrid, Barcelona, Sevilla...">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+
+          <!-- Botón principal de búsqueda -->
+          <button mat-raised-button color="primary" (click)="onSearch()">
+            <mat-icon>search</mat-icon>
+            Buscar
+          </button>
+
+          <!-- Botón para limpiar búsqueda (solo visible si hay texto) -->
+          <!-- *ngIf="searchQuery" muestra/oculta el elemento según condición -->
+          <button mat-button (click)="clearSearch()" *ngIf="searchQuery">
+            <mat-icon>clear</mat-icon>
+            Limpiar
+          </button>
+        </div>
+
+        <!-- ===== BOTÓN PARA ACTIVAR PLANIFICADOR DE RUTAS ===== -->
+        <!-- Solo visible cuando no está activo el modo ruta -->
+        <div class="route-planner" *ngIf="!isRouteMode">
+          <button mat-raised-button color="accent" (click)="enableRouteMode()">
+            <mat-icon>directions</mat-icon>
+            Planificar Ruta
+          </button>
+        </div>
+
+        <!-- ===== CONTROLES DE PLANIFICACIÓN DE RUTAS ===== -->
+        <!-- Solo visible cuando está activo el modo ruta (*ngIf="isRouteMode") -->
+        <div class="route-section" *ngIf="isRouteMode">
+          <h3>📍 Planifica tu ruta por España:</h3>
+
+          <!-- Campos de entrada para origen y destino -->
+          <div class="route-inputs">
+            <!-- Campo de origen -->
+            <mat-form-field appearance="outline" class="route-field">
+              <mat-label>¿Dónde estás?</mat-label>
+              <!-- Enlace bidireccional con routeOrigin -->
+              <input matInput
+                     [(ngModel)]="routeOrigin"
+                     (keyup.enter)="calculateRoute()"
+                     placeholder="Ej: Madrid, Barcelona, tu ciudad...">
+              <mat-icon matSuffix>my_location</mat-icon>
+            </mat-form-field>
+
+            <!-- Campo de destino -->
+            <mat-form-field appearance="outline" class="route-field">
+              <mat-label>¿Dónde quieres ir?</mat-label>
+              <input matInput
+                     [(ngModel)]="routeDestination"
+                     (keyup.enter)="calculateRoute()"
+                     placeholder="Ej: Sevilla, Valencia, tu destino...">
+              <mat-icon matSuffix>place</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <!-- Botones de control de ruta -->
+          <div class="route-controls">
+            <!-- Botón para calcular ruta -->
+            <!-- [disabled] desactiva el botón si faltan origen o destino -->
+            <button mat-raised-button color="primary"
+                    (click)="calculateRoute()"
+                    [disabled]="!routeOrigin || !routeDestination">
+              <mat-icon>route</mat-icon>
+              Calcular Ruta
+            </button>
+
+            <!-- Botón para salir del modo ruta -->
+            <button mat-button (click)="disableRouteMode()">
+              <mat-icon>close</mat-icon>
+              Cancelar
+            </button>
+          </div>
+
+          <!-- ===== OPCIONES DE RADIO DE BÚSQUEDA ===== -->
+          <!-- Solo visible después de calcular una ruta -->
+          <div class="route-options" *ngIf="isRouteCalculated">
+            <mat-form-field appearance="outline" class="radius-field">
+              <mat-label>Radio de búsqueda</mat-label>
+              <!-- Selector desplegable para ajustar el radio de búsqueda -->
+              <mat-select [(ngModel)]="searchRadius" (selectionChange)="updateRouteResults()">
+                <mat-option value="10">10 km de la ruta</mat-option>
+                <mat-option value="25">25 km de la ruta</mat-option>
+                <mat-option value="50">50 km de la ruta</mat-option>
+                <mat-option value="100">100 km de la ruta</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <!-- ===== FILTROS POR CATEGORÍA ===== -->
+        <!-- Chips interactivos para filtrar tipos de lugares -->
+        <div class="category-filters">
+          <h3>Filtrar por categoría:</h3>
+          <div class="chip-container">
+            <mat-chip-set>
+              <!-- *ngFor itera sobre cada configuración de categoría -->
+              <!-- Cada chip cambia de color según si está seleccionado -->
+              <mat-chip
+                *ngFor="let config of categoryConfigs"
+                (click)="onCategoryToggle(config.key)"
+                [class.selected-chip]="isCategorySelected(config.key)"
+                [style.background-color]="isCategorySelected(config.key) ? config.color : 'transparent'"
+                [style.color]="isCategorySelected(config.key) ? 'white' : config.color"
+                [style.border-color]="config.color">
+                <!-- Icono y etiqueta de la categoría -->
+                <mat-icon>{{config.icon}}</mat-icon>
+                {{config.label}}
+              </mat-chip>
+            </mat-chip-set>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- ========== CONTENEDOR PRINCIPAL DE MAPA Y LISTA ========== -->
+  <div class="main-content">
+
+    <!-- ===== SECCIÓN DEL MAPA ===== -->
+    <div class="map-section">
+      <!-- Contenedor donde se renderiza el mapa de Leaflet -->
+      <!-- #mapContainer es la referencia que usa el ViewChild en el TS -->
+      <div #mapContainer class="map-canvas">
+
+        <!-- ===== LEYENDA DEL MAPA ===== -->
+        <!-- Muestra los iconos y colores de cada categoría -->
+        <div class="map-legend">
+          <div *ngFor="let config of categoryConfigs"
+               class="legend-item"
+               [style.opacity]="isCategorySelected(config.key) ? 1 : 0.3">
+            <!-- El icono cambia de opacidad según si la categoría está seleccionada -->
+            <mat-icon [style.color]="config.color">{{config.icon}}</mat-icon>
+            <span>{{config.label}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== LISTA DE LUGARES ENCONTRADOS ===== -->
+    <div class="places-list">
+      <mat-card class="places-card">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>place</mat-icon>
+            <!-- Muestra dinámicamente el número de lugares encontrados -->
+            Lugares Encontrados ({{filteredPlaces.length}})
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="places-container">
+
+            <!-- ===== ELEMENTO INDIVIDUAL DE LUGAR ===== -->
+            <!-- *ngFor itera sobre cada lugar filtrado -->
+            <!-- (click) selecciona el lugar y [class.selected] resalta si está seleccionado -->
+            <div *ngFor="let place of filteredPlaces"
+                 class="place-item"
+                 (click)="selectPlace(place)"
+                 [class.selected]="selectedPlace?.id === place.id">
+
+              <!-- Cabecera del lugar con icono y nombre -->
+              <div class="place-header">
+                <!-- Icono coloreado según la categoría del lugar -->
+                <mat-icon [style.color]="getCategoryConfig(place.category)?.color">
+                  {{getCategoryConfig(place.category)?.icon}}
+                </mat-icon>
+                <h4>{{place.name}}</h4>
+              </div>
+
+              <!-- ===== INFORMACIÓN DETALLADA DEL LUGAR ===== -->
+              <div class="place-info">
+
+                <!-- Dirección (siempre visible) -->
+                <p class="address">
+                  <mat-icon>location_on</mat-icon>
+                  {{place.address}}
+                </p>
+
+                <!-- Teléfono (solo si existe) -->
+                <!-- *ngIf="place.phone" solo muestra si el lugar tiene teléfono -->
+                <p *ngIf="place.phone" class="phone">
+                  <mat-icon>phone</mat-icon>
+                  {{place.phone}}
+                </p>
+
+                <!-- Rating/Puntuación (solo si existe) -->
+                <div *ngIf="place.rating" class="rating">
+                  <mat-icon>star</mat-icon>
+                  <span>{{place.rating}}/5</span>
+                </div>
+
+                <!-- Descripción del lugar -->
+                <p *ngIf="place.description" class="description">
+                  {{place.description}}
+                </p>
+
+                <!-- ===== GALERÍA DE IMÁGENES ===== -->
+                <!-- Solo para lugares turísticos que tengan imágenes -->
+                <!-- Condición compleja: debe ser lugar turístico Y tener imágenes Y el array no estar vacío -->
+                <div *ngIf="place.category === 'tourist_attraction' && place.images && place.images.length > 0"
+                     class="image-gallery">
+                  <h5>Imágenes:</h5>
+                  <div class="images-container">
+                    <!-- *ngFor itera sobre cada imagen -->
+                    <!-- (click) abre la imagen en ventana modal -->
+                    <!-- loading="lazy" mejora el rendimiento cargando imágenes solo cuando son visibles -->
+                    <img *ngFor="let image of place.images; let i = index"
+                         [src]="image"
+                         [alt]="place.name"
+                         class="place-image"
+                         (click)="openImageModal(image, place.name)"
+                         loading="lazy">
+                  </div>
+                </div>
+              </div>
+
+              <!-- ===== BADGE DE CATEGORÍA ===== -->
+              <!-- Etiqueta coloreada que indica el tipo de lugar -->
+              <div class="place-category">
+                <span class="category-badge"
+                      [style.background-color]="getCategoryConfig(place.category)?.color">
+                  {{getCategoryConfig(place.category)?.label}}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== MENSAJE CUANDO NO HAY RESULTADOS ===== -->
+          <!-- Solo visible cuando no se encuentran lugares (*ngIf="filteredPlaces.length === 0") -->
+          <div *ngIf="filteredPlaces.length === 0" class="no-results">
+            <mat-icon>search_off</mat-icon>
+            <p>No se encontraron lugares con los filtros seleccionados</p>
+          </div>
+
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+</div>
+
+<!--
+=========================================
+RESUMEN DE FUNCIONALIDADES DEL COMPONENTE:
+=========================================
+
+1. BÚSQUEDA GENERAL:
+   - Campo de texto para buscar por nombre, ciudad o dirección
+   - Búsqueda en tiempo real al presionar Enter
+   - Botón de limpiar búsqueda
+
+2. PLANIFICADOR DE RUTAS:
+   - Modo especial para calcular trayectos
+   - Campos de origen y destino
+   - Búsqueda de lugares en el trayecto
+   - Selector de radio de búsqueda
+
+3. FILTROS POR CATEGORÍA:
+   - Chips interactivos para cada tipo de lugar
+   - Colores personalizados por categoría
+   - Filtrado en tiempo real
+
+4. VISUALIZACIÓN DEL MAPA:
+   - Mapa interactivo con Leaflet
+   - Marcadores coloreados por categoría
+   - Leyenda dinámica
+   - Zoom automático a los resultados
+
+5. LISTA DETALLADA:
+   - Lista scrolleable de lugares encontrados
+   - Información completa de cada lugar
+   - Galería de imágenes para lugares turísticos
+   - Selección de lugares individual
+
+6. RESPONSIVE DESIGN:
+   - Adaptable a móviles y tablets
+   - Layout flexible con CSS Grid/Flexbox
+-->
