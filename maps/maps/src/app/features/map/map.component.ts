@@ -13,13 +13,13 @@ import { MatCardModule } from '@angular/material/card';          // Tarjetas par
 import { FormsModule } from '@angular/forms';                    // Para ngModel y formularios
 
 // Servicios personalizados de la aplicación
-import { MapsService } from '../../core/maps.service';           // Servicio para manejo del mapa Leaflet
+import { MapsService, RouteInfo } from '../../core/maps.service'; // Servicio para manejo del mapa Leaflet
 import { PlacesService } from '../../core/places.service';       // Servicio para gestión de lugares
 import { Place, PlaceCategory, PlaceCategoryConfig } from '../../models/place.model'; // Modelos de datos
 
 /**
  * COMPONENTE PRINCIPAL DEL MAPA INTERACTIVO
- * 
+ *
  * Este componente maneja toda la funcionalidad del mapa de España:
  * - Visualización del mapa con Leaflet
  * - Búsqueda y filtrado de lugares
@@ -50,44 +50,53 @@ export class MapComponent implements OnInit, AfterViewInit {
   @ViewChild('mapContainer', { static: false }) mapContainer!: ElementRef;
 
   // ===== PROPIEDADES PRINCIPALES =====
-  
+
   // Almacena todos los lugares cargados desde el servicio
   places: Place[] = [];
-  
+
   // Lugares que se muestran actualmente (después de filtros y búsqueda)
   filteredPlaces: Place[] = [];
-  
+
   // Categorías seleccionadas para el filtrado (restaurantes, hoteles, etc.)
   selectedCategories: PlaceCategory[] = [];
-  
+
   // Configuración de categorías (colores, iconos, etiquetas)
   categoryConfigs: PlaceCategoryConfig[] = [];
-  
+
   // Texto de búsqueda introducido por el usuario
   searchQuery: string = '';
-  
+
   // Lugar seleccionado actualmente (para mostrar detalles)
   selectedPlace: Place | null = null;
 
   // ===== PROPIEDADES PARA FUNCIONALIDAD DE RUTAS =====
-  
+
   // Indica si está activo el modo de planificación de rutas
   isRouteMode: boolean = false;
-  
+
   // Indica si se ha calculado una ruta exitosamente
   isRouteCalculated: boolean = false;
-  
+
   // Ciudad/dirección de origen para la ruta
   routeOrigin: string = '';
-  
+
   // Ciudad/dirección de destino para la ruta
   routeDestination: string = '';
-  
+
   // Radio de búsqueda en kilómetros para lugares en la ruta
   searchRadius: number = 25;
-  
+
   // Lugares encontrados en el trayecto de la ruta
   routePlaces: Place[] = [];
+
+  // Información de las rutas calculadas
+  calculatedRoutes: RouteInfo[] = [];
+
+  // Ruta seleccionada actualmente
+  selectedRouteIndex: number = 0;
+
+  // Referencia a Math para el template
+  Math = Math;
 
   /**
    * CONSTRUCTOR - Inyección de dependencias
@@ -107,7 +116,7 @@ export class MapComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     // Obtener configuración de categorías (colores, iconos, etiquetas)
     this.categoryConfigs = this.placesService.getCategoryConfigs();
-    
+
     // Por defecto, mostrar todas las categorías seleccionadas
     this.selectedCategories = this.categoryConfigs.map(config => config.key);
 
@@ -293,24 +302,69 @@ export class MapComponent implements OnInit, AfterViewInit {
     this.routeOrigin = '';
     this.routeDestination = '';
     this.routePlaces = [];
+    this.calculatedRoutes = [];
+    this.selectedRouteIndex = 0;
+
+    // Limpiar rutas del mapa
+    this.mapsService.clearRoutes();
+
     // Volver a mostrar todos los lugares normalmente
     this.filterPlaces();
   }
 
   /**
    * CALCULAR RUTA ENTRE DOS PUNTOS
-   * Busca lugares de interés en el trayecto especificado
+   * Utiliza el servicio de mapas para calcular rutas reales y dibujar líneas
    */
-  calculateRoute(): void {
+  async calculateRoute(): Promise<void> {
     if (!this.routeOrigin.trim() || !this.routeDestination.trim()) {
       return; // No hacer nada si faltan origen o destino
     }
 
     console.log(`🗺️ Calculando ruta de ${this.routeOrigin} a ${this.routeDestination}`);
 
-    // Marcar que la ruta ha sido calculada y buscar lugares
-    this.isRouteCalculated = true;
-    this.findPlacesAlongRoute();
+    try {
+      // Limpiar marcadores de lugares para mostrar solo la ruta
+      this.mapsService.clearMarkers();
+      this.mapsService.clearRoutes();
+
+      // Calcular rutas reales usando el servicio
+      const routes = await this.mapsService.calculateRoute(this.routeOrigin, this.routeDestination);
+
+      if (routes && routes.length > 0) {
+        // Dibujar las rutas en el mapa
+        this.mapsService.drawRoutes(routes);
+
+        // Añadir marcadores de origen y destino
+        if (routes[0].coordinates.length >= 2) {
+          this.mapsService.addRouteMarkers(
+            routes[0].coordinates[0],
+            routes[0].coordinates[routes[0].coordinates.length - 1],
+            this.routeOrigin,
+            this.routeDestination
+          );
+        }
+
+        // Mostrar información de las rutas
+        this.displayRouteInfo(routes);
+
+        // Marcar que la ruta ha sido calculada
+        this.isRouteCalculated = true;
+
+        // Buscar lugares de interés en el trayecto
+        this.findPlacesAlongRoute();
+
+        console.log(`✅ ${routes.length} rutas calculadas exitosamente`);
+      } else {
+        console.error('❌ No se pudieron calcular rutas');
+      }
+
+    } catch (error) {
+      console.error('Error calculando ruta:', error);
+      // Fallback a método anterior si hay error
+      this.isRouteCalculated = true;
+      this.findPlacesAlongRoute();
+    }
   }
 
   private findPlacesAlongRoute(): void {
@@ -370,6 +424,46 @@ export class MapComponent implements OnInit, AfterViewInit {
     const intermediateCities = routeMapping[routeKey1] || routeMapping[routeKey2] || [];
 
     return intermediateCities.some(city => address.includes(city));
+  }
+
+  /**
+   * MOSTRAR INFORMACIÓN DE LAS RUTAS CALCULADAS
+   * Almacena y muestra los datos de tiempo y distancia
+   */
+  displayRouteInfo(routes: RouteInfo[]): void {
+    this.calculatedRoutes = routes;
+    this.selectedRouteIndex = 0; // Seleccionar la primera ruta por defecto
+
+    // Mostrar información en consola
+    routes.forEach((route, index) => {
+      const hours = Math.floor(route.duration / 60);
+      const minutes = route.duration % 60;
+      console.log(`🛣️ Ruta ${index + 1}: ${route.distance}km - ${hours}h ${minutes}min`);
+    });
+  }
+
+  /**
+   * SELECCIONAR UNA RUTA ESPECÍFICA
+   * Permite al usuario elegir entre diferentes opciones de ruta
+   */
+  selectRoute(routeIndex: number): void {
+    if (routeIndex >= 0 && routeIndex < this.calculatedRoutes.length) {
+      this.selectedRouteIndex = routeIndex;
+
+      // Redescar la ruta seleccionada con diferente estilo
+      this.mapsService.clearRoutes();
+      const selectedRoute = [this.calculatedRoutes[routeIndex]];
+      this.mapsService.drawRoutes(selectedRoute);
+
+      console.log(`✅ Seleccionada ruta ${routeIndex + 1}`);
+    }
+  }
+
+  /**
+   * OBTENER RUTA SELECCIONADA ACTUALMENTE
+   */
+  getSelectedRoute(): RouteInfo | null {
+    return this.calculatedRoutes[this.selectedRouteIndex] || null;
   }
 
   updateRouteResults(): void {

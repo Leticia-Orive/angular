@@ -88,11 +88,69 @@
             </button>
           </div>
 
-          <!-- ===== OPCIONES DE RADIO DE BÚSQUEDA ===== -->
+          <!-- ===== INFORMACIÓN DE RUTAS CALCULADAS ===== -->
           <!-- Solo visible después de calcular una ruta -->
+          <div class="route-results" *ngIf="isRouteCalculated && calculatedRoutes.length > 0">
+            <h4>🛣️ Opciones de Ruta:</h4>
+
+            <!-- Lista de rutas disponibles -->
+            <div class="routes-list">
+              <div *ngFor="let route of calculatedRoutes; let i = index"
+                   class="route-option"
+                   [class.selected-route]="selectedRouteIndex === i"
+                   (click)="selectRoute(i)">
+
+                <div class="route-header">
+                  <div class="route-number">{{i + 1}}</div>
+                  <div class="route-type">
+                    <span *ngIf="i === 0" class="route-label fastest">⚡ Más Rápida</span>
+                    <span *ngIf="i === 1" class="route-label alternative">🛣️ Alternativa</span>
+                    <span *ngIf="i > 1" class="route-label other">📍 Opción {{i + 1}}</span>
+                  </div>
+                </div>
+
+                <div class="route-stats">
+                  <div class="stat-item">
+                    <mat-icon>straighten</mat-icon>
+                    <span><strong>{{route.distance}}</strong> km</span>
+                  </div>
+
+                  <div class="stat-item">
+                    <mat-icon>schedule</mat-icon>
+                    <span>
+                      <strong>
+                        <span *ngIf="route.duration >= 60">{{Math.floor(route.duration / 60)}}h </span>
+                        {{route.duration % 60}}min
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div class="stat-item">
+                    <mat-icon>speed</mat-icon>
+                    <span>{{Math.round(route.distance / (route.duration / 60))}} km/h</span>
+                  </div>
+                </div>
+
+                <!-- Botón para seleccionar esta ruta -->
+                <button mat-button
+                        *ngIf="selectedRouteIndex !== i"
+                        (click)="selectRoute(i); $event.stopPropagation()"
+                        class="select-route-btn">
+                  Elegir esta ruta
+                </button>
+
+                <div *ngIf="selectedRouteIndex === i" class="selected-indicator">
+                  <mat-icon>check_circle</mat-icon>
+                  Ruta Seleccionada
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== OPCIONES DE RADIO DE BÚSQUEDA ===== -->
           <div class="route-options" *ngIf="isRouteCalculated">
             <mat-form-field appearance="outline" class="radius-field">
-              <mat-label>Radio de búsqueda</mat-label>
+              <mat-label>Radio de búsqueda de lugares</mat-label>
               <!-- Selector desplegable para ajustar el radio de búsqueda -->
               <mat-select [(ngModel)]="searchRadius" (selectionChange)="updateRouteResults()">
                 <mat-option value="10">10 km de la ruta</mat-option>

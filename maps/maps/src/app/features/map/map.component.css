@@ -463,6 +463,146 @@
   }
 }
 
+/* ===== ESTILOS PARA INFORMACIÓN DE RUTAS ===== */
+.route-results {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #2196F3;
+}
+
+.route-results h4 {
+  margin: 0 0 16px 0;
+  color: #1976D2;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.route-option {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.route-option:hover {
+  border-color: #2196F3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+}
+
+.route-option.selected-route {
+  border-color: #4CAF50;
+  background: linear-gradient(135deg, #f1f8e9 0%, #ffffff 100%);
+}
+
+.route-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.route-number {
+  background: #2196F3;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.selected-route .route-number {
+  background: #4CAF50;
+}
+
+.route-type {
+  flex: 1;
+}
+
+.route-label {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.route-label.fastest {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.route-label.alternative {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.route-label.other {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.route-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #555;
+  font-size: 14px;
+}
+
+.stat-item mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #666;
+}
+
+.stat-item strong {
+  color: #2196F3;
+}
+
+.select-route-btn {
+  margin-top: 8px;
+  background: #2196F3;
+  color: white;
+  border-radius: 6px;
+}
+
+.selected-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4CAF50;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.selected-indicator mat-icon {
+  color: #4CAF50;
+}
+
 /* Responsive para rutas */
 @media (max-width: 768px) {
   .route-inputs {
@@ -481,5 +621,15 @@
   .route-controls button {
     width: 100%;
     max-width: 250px;
+  }
+
+  .route-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .route-results {
+    margin-top: 16px;
+    padding: 12px;
   }
 }
