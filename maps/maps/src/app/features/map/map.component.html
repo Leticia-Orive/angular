@@ -30,6 +30,12 @@
             <mat-icon>clear</mat-icon>
             Limpiar
           </button>
+
+          <!-- Botón para mostrar todos los lugares (solo visible si hay un lugar seleccionado) -->
+          <button mat-raised-button color="warn" (click)="showAllPlaces()" *ngIf="selectedPlace">
+            <mat-icon>map</mat-icon>
+            Mostrar Todos
+          </button>
         </div>
 
         <!-- ===== BOTÓN PARA ACTIVAR PLANIFICADOR DE RUTAS ===== -->
@@ -119,15 +125,15 @@
                     <mat-icon>schedule</mat-icon>
                     <span>
                       <strong>
-                        <span *ngIf="route.duration >= 60">{{Math.floor(route.duration / 60)}}h </span>
-                        {{route.duration % 60}}min
+                        <span *ngIf="route.duration >= 60">{{getHours(route.duration)}}h </span>
+                        {{getMinutes(route.duration)}}min
                       </strong>
                     </span>
                   </div>
 
                   <div class="stat-item">
                     <mat-icon>speed</mat-icon>
-                    <span>{{Math.round(route.distance / (route.duration / 60))}} km/h</span>
+                    <span>{{getAverageSpeed(route.distance, route.duration)}} km/h</span>
                   </div>
                 </div>
 

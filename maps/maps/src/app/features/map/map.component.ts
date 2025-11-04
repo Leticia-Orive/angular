@@ -133,7 +133,10 @@ export class MapComponent implements OnInit, AfterViewInit {
    * Necesario para acceder a elementos del DOM como #mapContainer
    */
   ngAfterViewInit(): void {
-    this.initializeMap();
+    // Pequeño retraso para asegurar que el DOM esté completamente renderizado
+    setTimeout(() => {
+      this.initializeMap();
+    }, 50);
   }
 
   /**
@@ -141,11 +144,25 @@ export class MapComponent implements OnInit, AfterViewInit {
    * Crea el mapa en el elemento HTML y añade los marcadores iniciales
    */
   private initializeMap(): void {
+    console.log('🗺️ Inicializando mapa...');
+    console.log('📍 mapContainer:', this.mapContainer);
+    console.log('📍 mapContainer.nativeElement:', this.mapContainer?.nativeElement);
+
     if (this.mapContainer?.nativeElement) {
-      // Crear el mapa de Leaflet en el elemento HTML
-      this.mapsService.initializeMap(this.mapContainer.nativeElement);
-      // Añadir todos los marcadores iniciales
-      this.updateMarkers();
+      console.log('✅ Elemento del mapa encontrado, inicializando Leaflet...');
+      try {
+        // Crear el mapa de Leaflet en el elemento HTML
+        this.mapsService.initializeMap(this.mapContainer.nativeElement);
+        console.log('✅ Mapa de Leaflet inicializado correctamente');
+
+        // Añadir todos los marcadores iniciales
+        this.updateMarkers();
+        console.log('✅ Marcadores iniciales añadidos');
+      } catch (error) {
+        console.error('❌ Error inicializando el mapa:', error);
+      }
+    } else {
+      console.error('❌ No se pudo encontrar el elemento del mapa');
     }
   }
 
@@ -251,12 +268,38 @@ export class MapComponent implements OnInit, AfterViewInit {
   /**
    * SELECCIONAR UN LUGAR ESPECÍFICO
    * Se ejecuta cuando el usuario hace clic en un lugar de la lista
+   * Centra el mapa en ese lugar y muestra solo ese marcador
    * @param place - Lugar seleccionado
    */
   selectPlace(place: Place): void {
     this.selectedPlace = place;
-    // TODO: Centrar el mapa en el lugar seleccionado
-    console.log('Lugar seleccionado:', place.name);
+
+    console.log('📍 Lugar seleccionado:', place.name);
+
+    // Limpiar todos los marcadores existentes
+    this.mapsService.clearMarkers();
+    this.mapsService.clearRoutes();
+
+    // Obtener configuración de la categoría del lugar
+    const config = this.getCategoryConfig(place.category);
+
+    // Añadir solo el marcador del lugar seleccionado
+    this.mapsService.addMarker(
+      place.location.lat,
+      place.location.lng,
+      place.name,
+      config?.icon,
+      config?.color
+    );
+
+    // Centrar el mapa en el lugar seleccionado con zoom apropiado
+    this.mapsService.centerMapOnLocation(
+      place.location.lat,
+      place.location.lng,
+      16  // Zoom cercano para ver detalles
+    );
+
+    console.log(`✅ Mapa centrado en ${place.name} - ${place.address}`);
   }
 
   /**
@@ -277,6 +320,16 @@ export class MapComponent implements OnInit, AfterViewInit {
   clearSearch(): void {
     this.searchQuery = '';
     this.filterPlaces();
+  }
+
+  /**
+   * VOLVER A MOSTRAR TODOS LOS LUGARES
+   * Deselecciona el lugar actual y muestra todos los lugares filtrados
+   */
+  showAllPlaces(): void {
+    this.selectedPlace = null;
+    this.updateMarkers(); // Esto mostrará todos los lugares filtrados
+    console.log('🗺️ Mostrando todos los lugares');
   }
 
   // ======= MÉTODOS DE RUTA =======
@@ -316,55 +369,58 @@ export class MapComponent implements OnInit, AfterViewInit {
    * CALCULAR RUTA ENTRE DOS PUNTOS
    * Utiliza el servicio de mapas para calcular rutas reales y dibujar líneas
    */
-  async calculateRoute(): Promise<void> {
+  calculateRoute(): void {
     if (!this.routeOrigin.trim() || !this.routeDestination.trim()) {
+      console.warn('⚠️ Faltan origen o destino para calcular la ruta');
       return; // No hacer nada si faltan origen o destino
     }
 
     console.log(`🗺️ Calculando ruta de ${this.routeOrigin} a ${this.routeDestination}`);
 
-    try {
-      // Limpiar marcadores de lugares para mostrar solo la ruta
-      this.mapsService.clearMarkers();
-      this.mapsService.clearRoutes();
+    // Llamar al servicio de forma asíncrona
+    this.mapsService.calculateRoute(this.routeOrigin, this.routeDestination)
+      .then(routes => {
+        if (routes && routes.length > 0) {
+          console.log(`📍 Rutas calculadas:`, routes);
 
-      // Calcular rutas reales usando el servicio
-      const routes = await this.mapsService.calculateRoute(this.routeOrigin, this.routeDestination);
+          // Limpiar el mapa antes de mostrar la nueva ruta
+          this.mapsService.clearMarkers();
+          this.mapsService.clearRoutes();
 
-      if (routes && routes.length > 0) {
-        // Dibujar las rutas en el mapa
-        this.mapsService.drawRoutes(routes);
+          // Dibujar las rutas en el mapa
+          this.mapsService.drawRoutes(routes);
 
-        // Añadir marcadores de origen y destino
-        if (routes[0].coordinates.length >= 2) {
-          this.mapsService.addRouteMarkers(
-            routes[0].coordinates[0],
-            routes[0].coordinates[routes[0].coordinates.length - 1],
-            this.routeOrigin,
-            this.routeDestination
-          );
+          // Añadir marcadores de origen y destino
+          if (routes[0].coordinates.length >= 2) {
+            this.mapsService.addRouteMarkers(
+              routes[0].coordinates[0],
+              routes[0].coordinates[routes[0].coordinates.length - 1],
+              this.routeOrigin,
+              this.routeDestination
+            );
+          }
+
+          // Mostrar información de las rutas
+          this.displayRouteInfo(routes);
+
+          // Marcar que la ruta ha sido calculada
+          this.isRouteCalculated = true;
+
+          // Buscar lugares de interés en el trayecto
+          this.findPlacesAlongRoute();
+
+          console.log(`✅ ${routes.length} rutas calculadas exitosamente`);
+        } else {
+          console.error('❌ No se pudieron calcular rutas');
+          this.isRouteCalculated = false;
         }
-
-        // Mostrar información de las rutas
-        this.displayRouteInfo(routes);
-
-        // Marcar que la ruta ha sido calculada
+      })
+      .catch(error => {
+        console.error('Error calculando ruta:', error);
+        // Fallback a método anterior si hay error
         this.isRouteCalculated = true;
-
-        // Buscar lugares de interés en el trayecto
         this.findPlacesAlongRoute();
-
-        console.log(`✅ ${routes.length} rutas calculadas exitosamente`);
-      } else {
-        console.error('❌ No se pudieron calcular rutas');
-      }
-
-    } catch (error) {
-      console.error('Error calculando ruta:', error);
-      // Fallback a método anterior si hay error
-      this.isRouteCalculated = true;
-      this.findPlacesAlongRoute();
-    }
+      });
   }
 
   private findPlacesAlongRoute(): void {
@@ -470,5 +526,35 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (this.isRouteCalculated) {
       this.findPlacesAlongRoute();
     }
+  }
+
+  /**
+   * MÉTODOS HELPER PARA EL TEMPLATE
+   * Evitan usar Math directamente en el HTML
+   */
+
+  // Calcular horas de una duración en minutos
+  getHours(minutes: number): number {
+    return Math.floor(minutes / 60);
+  }
+
+  // Obtener minutos restantes después de extraer las horas
+  getMinutes(minutes: number): number {
+    return minutes % 60;
+  }
+
+  // Calcular velocidad promedio
+  getAverageSpeed(distance: number, durationMinutes: number): number {
+    return Math.round(distance / (durationMinutes / 60));
+  }
+
+  // Redondear un número
+  round(value: number): number {
+    return Math.round(value);
+  }
+
+  // Calcular el floor de un número
+  floor(value: number): number {
+    return Math.floor(value);
   }
 }
