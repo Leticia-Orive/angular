@@ -20,21 +20,45 @@ export class MapsService {
   constructor() {}
 
   initializeMap(mapElement: HTMLElement): L.Map {
-    // Centrar en España
-    this.map = L.map(mapElement, {
-      center: [40.0, -4.0], // Centro geográfico de España
-      zoom: 6,
-      zoomControl: true,
-      scrollWheelZoom: true
+    console.log('🗺️ MapsService: Inicializando mapa de Leaflet...');
+    console.log('📍 Elemento HTML recibido:', mapElement);
+    console.log('📍 Dimensiones del elemento:', {
+      width: mapElement.offsetWidth,
+      height: mapElement.offsetHeight,
+      clientWidth: mapElement.clientWidth,
+      clientHeight: mapElement.clientHeight
     });
 
-    // Añadir capa de OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(this.map);
+    try {
+      // Centrar en España
+      this.map = L.map(mapElement, {
+        center: [40.0, -4.0], // Centro geográfico de España
+        zoom: 6,
+        zoomControl: true,
+        scrollWheelZoom: true
+      });
 
-    return this.map;
+      console.log('✅ Mapa de Leaflet creado');
+
+      // Añadir capa de OpenStreetMap
+      const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(this.map);
+
+      console.log('✅ Capa de tiles añadida');
+
+      // Forzar el redimensionamiento del mapa después de un breve retraso
+      setTimeout(() => {
+        this.map.invalidateSize();
+        console.log('🔄 Mapa redimensionado');
+      }, 100);
+
+      return this.map;
+    } catch (error) {
+      console.error('❌ Error creando el mapa de Leaflet:', error);
+      throw error;
+    }
   }
 
   addMarker(
@@ -72,6 +96,19 @@ export class MapsService {
 
   fitBounds(bounds: L.LatLngBounds): void {
     this.map.fitBounds(bounds);
+  }
+
+  /**
+   * CENTRAR MAPA EN UNA UBICACIÓN ESPECÍFICA
+   * @param lat - Latitud del lugar
+   * @param lng - Longitud del lugar
+   * @param zoom - Nivel de zoom (opcional, por defecto 16)
+   */
+  centerMapOnLocation(lat: number, lng: number, zoom: number = 16): void {
+    this.map.setView([lat, lng], zoom, {
+      animate: true,
+      duration: 1.0 // Animación suave de 1 segundo
+    });
   }
 
   getMap(): L.Map {
